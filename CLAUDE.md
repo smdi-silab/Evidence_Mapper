@@ -7,7 +7,7 @@ Evidence Mapper is <!-- TODO: one-paragraph description of what the app does and
 - **Backend:** Python 3.12, FastAPI, SQLAlchemy 2.x, Alembic (migrations), Pydantic v2, pytest. Dependency management with `uv`. Lint/format with `ruff`.
 - **Database:** PostgreSQL 16. Docker locally; Amazon RDS in AWS.
 - **Frontend:** React + TypeScript (strict), built with Vite, tested with Vitest.
-- **Infrastructure:** AWS CDK (Python) in `infra/`.
+- **Infrastructure:** Terraform (HCL) with the AWS provider, in `infra/`. State is stored remotely in S3 with state locking, never in the repo.
 - **Local dev:** Docker Compose (`docker-compose.yml` at the repo root).
 
 ## Repo layout
@@ -20,7 +20,7 @@ docs/
   decisions/         Architecture Decision Records (ADRs)
 backend/             FastAPI app, Alembic migrations, backend tests
 frontend/            React app and frontend tests
-infra/               AWS CDK app
+infra/               Terraform configuration (.tf files, .terraform.lock.hcl committed)
 ```
 
 ## How we work: spec-driven development
@@ -41,9 +41,10 @@ infra/               AWS CDK app
 
 ## AWS safety rules
 - The developer is new to AWS. When introducing an AWS service or concept for the first time, explain briefly what it is and why it's needed.
-- **Never run commands that create, change, or delete AWS resources without explicit approval in the current session.** This includes `cdk deploy`, `cdk destroy`, `cdk bootstrap`, and any `aws` command that creates, updates, puts, or deletes.
-- Read-only commands are fine: `cdk synth`, `cdk diff`, `aws ... describe/list/get`, `aws sts get-caller-identity`.
-- Always show `cdk diff` output and summarize it before proposing a deploy.
+- **Never run commands that create, change, or delete AWS resources or Terraform state without explicit approval in the current session.** This includes `terraform apply`, `terraform destroy`, `terraform import`, any `terraform state` command that changes state (`mv`, `rm`, `push`, `replace-provider`), and any `aws` command that creates, updates, puts, or deletes.
+- These are fine without asking: `terraform fmt`, `terraform validate`, `terraform init`, `terraform plan`, and read-only `aws` commands (`describe`, `list`, `get`, `aws sts get-caller-identity`).
+- Always show `terraform plan` output and summarize it (what will be created, changed, and destroyed) before proposing an apply.
+- Terraform state lives in a remote S3 backend with state locking. Never commit state files or `.tfvars` files containing real values; commit only `*.tfvars.example`.
 - Never hardcode credentials. Use the AWS profile in `AWS_PROFILE`. App secrets go in AWS Secrets Manager.
 - Prefer the smallest, cheapest resource sizes in dev, and point out anything that costs money while idle.
 
@@ -59,4 +60,6 @@ infra/               AWS CDK app
 - Backend tests: `cd backend && uv run pytest`
 - Backend lint: `cd backend && uv run ruff check .`
 - Frontend tests: `cd frontend && npm test`
-- Infra synth: `cd infra && cdk synth`
+- Infra format check: `cd infra && terraform fmt -check -recursive`
+- Infra validate: `cd infra && terraform init && terraform validate`
+- Infra plan (read-only preview): `cd infra && terraform plan`

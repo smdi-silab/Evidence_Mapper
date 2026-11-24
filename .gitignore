@@ -21,9 +21,16 @@ dist/
 build/
 coverage/
 
-# AWS CDK
-cdk.out/
-.cdk.staging/
+# Terraform (.terraform.lock.hcl is intentionally committed)
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+!*.tfvars.json.example
 
 # Editors and OS
 .vscode/*
