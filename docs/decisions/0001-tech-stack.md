@@ -1,18 +1,22 @@
 # ADR 0001: Core tech stack
 
-- **Status:** Accepted
-- **Date:** <!-- YYYY-MM-DD -->
+- **Status:** Accepted. The web-application parts are deferred until after the feasibility gate by [ADR 0002](0002-feasibility-spike-first.md).
+- **Date:** 2026-11-24
 
 ## Context
-We need a stack the team knows well, that Claude Code works effectively with, and that deploys cleanly to AWS.
+We need a stack the team knows well, that Claude Code works effectively with, and that deploys cleanly to AWS. Per ADR 0003, it must also stay portable to local hosting.
 
 ## Decision
-- Backend: Python 3.12 + FastAPI, SQLAlchemy 2.x, Alembic, Pydantic v2
-- Database: PostgreSQL
-- Frontend: React + TypeScript, built with Vite
+Applies now, to the feasibility spike:
+- Language: Python 3.12, Pydantic v2
+- Python dependency management: uv; lint and format with ruff; tests with pytest
 - Infrastructure as code: Terraform (HCL) with the AWS provider, state stored remotely in S3 with state locking
+
+Provisional for the post-gate application (deferred by ADR 0002):
+- Backend: FastAPI, SQLAlchemy 2.x, Alembic
+- Database: PostgreSQL (optionally pgvector, per SiLab spec §4.8)
+- Frontend: React + TypeScript, built with Vite. **Not yet settled:** SiLab spec §4.8 proposes Streamlit (with Cytoscape.js) as the review UI, and §9.8 leaves Streamlit vs. React open. Resolve in an ADR before the post-gate UI spec.
 - Local development: Docker Compose
-- Python dependency management: uv
 
 ## Consequences
 - Infrastructure is written in HCL, a second language alongside Python and TypeScript, but Terraform is widely used, well documented, and not tied to a single cloud.
@@ -24,3 +28,4 @@ We need a stack the team knows well, that Claude Code works effectively with, an
 ## Alternatives considered
 - AWS CDK (Python) instead of Terraform: keeps infrastructure in Python, but is AWS-only, synthesizes to CloudFormation (an extra layer to debug), and needs a per-account `cdk bootstrap` step. Originally chosen, then rejected in favor of Terraform.
 - Plain JavaScript frontend: less setup, weaker safety.
+- Streamlit frontend: proposed in SiLab spec §4.8. Still open; see Decision.

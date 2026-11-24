@@ -2,6 +2,8 @@
 
 Every feature moves through the same steps. Nothing gets built until it has an approved spec.
 
+[`Regulatory_Evidence_Mapper_SiLab_Spec.md`](Regulatory_Evidence_Mapper_SiLab_Spec.md) in this folder is the project baseline from SiLab, not a numbered feature spec. Feature specs refer to it as "SiLab §n".
+
 | Step | File | Who writes it | Done when |
 |------|------|---------------|-----------|
 | 1. Define | `spec.md` | You (Claude can draft) | You've reviewed it and set Status to Approved |
