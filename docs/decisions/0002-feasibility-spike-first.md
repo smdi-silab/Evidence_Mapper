@@ -18,7 +18,7 @@ The original project scaffolding (ADR 0001, spec 001) instead started with a web
 - The first code is a Python package for the pipeline (see ADR 0006), not a web app.
 - If the gate result is NARROW or STOP, no effort has been spent on a UI or persistence layer.
 - `backend/` and `frontend/` won't exist until after the gate. The docs mark them as post-gate.
-- The post-gate UI choice is still open: React (ADR 0001) or Streamlit (SiLab §4.8, §9.8).
+- The post-gate UI will be React + TypeScript (ADR 0013).
 
 ## Alternatives considered
 - Web skeleton first (the original spec 001): rejected. It builds infrastructure the gate might make unnecessary and goes against SiLab §10.

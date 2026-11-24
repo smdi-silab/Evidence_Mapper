@@ -43,13 +43,13 @@ D-01 requires that the app can be hosted on local hardware, not only in AWS. Rul
 - The local hardware envelope is still unknown (MI-05). It determines the largest feasible model and the cost projection.
 
 ## After the gate (provisional, not yet built)
-The SiLab spec §4.8 proposes PostgreSQL (optionally pgvector) with relational entity and link tables instead of a graph database, Python processing jobs, and FastAPI query endpoints. The UI is still open: Streamlit with Cytoscape.js (§4.8) or a small React app (ADR 0001). See §9.8.
+The SiLab spec §4.8 proposes PostgreSQL (optionally pgvector) with relational entity and link tables instead of a graph database, Python processing jobs, and FastAPI query endpoints. Where §4.8 proposes Streamlit for the UI, we use a React + TypeScript app instead (ADR 0013, resolving §9.8). It may use Cytoscape.js for the graph drill-down.
 
 ### Local development (after the gate)
 Everything runs in Docker Compose:
 - `db`: PostgreSQL 16
 - `backend`: FastAPI (served by uvicorn) on port 8000
-- `frontend`: dev server on port 5173
+- `frontend`: Vite dev server (React) on port 5173
 
 ### Target AWS architecture (after the gate)
 | Piece | AWS service | What it does |

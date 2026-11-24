@@ -16,7 +16,7 @@ Regulatory Evidence Mapper is an AI-assisted accelerator being built on spec for
 - **Models:** open-weight only, developed on AWS Bedrock and runnable on local hardware without code changes (ADR 0003). Called only through a client interface that doesn't depend on the provider (ADR 0005, proposed). Claude may also be used during the pilot (ADR 0012).
 - **Infrastructure:** Terraform (HCL) with the AWS provider, in `infra/`. State is stored remotely in S3 with state locking, never in the repo.
 
-**After the gate (provisional, ADR 0001):** FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL 16 (Docker locally, Amazon RDS in AWS), and Docker Compose for local dev. The frontend (React + TypeScript vs. Streamlit) is still undecided (SiLab §9.8).
+**After the gate (provisional, ADR 0001):** FastAPI, SQLAlchemy 2.x, Alembic, PostgreSQL 16 (Docker locally, Amazon RDS in AWS), React + TypeScript (strict) frontend built with Vite and tested with Vitest (ADR 0013), and Docker Compose for local dev.
 
 **Portability:** the app may need to be hosted outside AWS (D-01). Keep AWS-specific services behind configuration or adapters, so the same code runs locally and in AWS.
 
@@ -34,7 +34,7 @@ pipeline/            spike: Python CLI package, one module per pipeline stage, t
 data/                spike data: raw and extracted data gitignored; manifests committed
 infra/               Terraform configuration (.tf files, .terraform.lock.hcl committed)
 backend/             after the gate: FastAPI app, Alembic migrations, backend tests
-frontend/            after the gate: UI and frontend tests
+frontend/            after the gate: React app and frontend tests
 ```
 
 ## How we work: spec-driven development

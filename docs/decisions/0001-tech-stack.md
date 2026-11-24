@@ -15,7 +15,7 @@ Applies now, to the feasibility spike:
 Provisional for the post-gate application (deferred by ADR 0002):
 - Backend: FastAPI, SQLAlchemy 2.x, Alembic
 - Database: PostgreSQL (optionally pgvector, per SiLab spec §4.8)
-- Frontend: React + TypeScript, built with Vite. **Not yet settled:** SiLab spec §4.8 proposes Streamlit (with Cytoscape.js) as the review UI, and §9.8 leaves Streamlit vs. React open. Resolve in an ADR before the post-gate UI spec.
+- Frontend: React + TypeScript, built with Vite (confirmed over Streamlit by [ADR 0013](0013-react-frontend.md))
 - Local development: Docker Compose
 
 ## Consequences
@@ -28,4 +28,4 @@ Provisional for the post-gate application (deferred by ADR 0002):
 ## Alternatives considered
 - AWS CDK (Python) instead of Terraform: keeps infrastructure in Python, but is AWS-only, synthesizes to CloudFormation (an extra layer to debug), and needs a per-account `cdk bootstrap` step. Originally chosen, then rejected in favor of Terraform.
 - Plain JavaScript frontend: less setup, weaker safety.
-- Streamlit frontend: proposed in SiLab spec §4.8. Still open; see Decision.
+- Streamlit frontend: proposed in SiLab spec §4.8; rejected in ADR 0013.
