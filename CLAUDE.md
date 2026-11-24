@@ -31,6 +31,7 @@ docs/
   decision-register.md  living register of spike decisions and their status
   decisions/         Architecture Decision Records (ADRs)
 pipeline/            spike: Python CLI package, one module per pipeline stage, tests
+spikes/              exploratory throwaway code, one folder per question (see Testing policy)
 data/                spike data: raw and extracted data gitignored; manifests committed
 infra/               Terraform configuration (.tf files, .terraform.lock.hcl committed)
 backend/             after the gate: FastAPI app, Alembic migrations, backend tests
@@ -38,16 +39,35 @@ frontend/            after the gate: React app and frontend tests
 ```
 
 ## How we work: spec-driven development
-1. **No code without a spec.** Every feature lives in `specs/NNN-short-name/` with `spec.md`, `plan.md`, and `tasks.md`, created from `specs/_templates/`.
+1. **No code without a spec** (except exploratory spikes in `spikes/`; see [Testing policy](#testing-policy)). Every feature lives in `specs/NNN-short-name/` with `spec.md`, `plan.md`, and `tasks.md`, created from `specs/_templates/`.
 2. **Read before you write.** Before changing code, read the relevant `spec.md` and `plan.md`. If a request isn't covered by a spec, say so and offer to draft or update the spec first.
 3. **`spec.md` is the what and why, and the human owns it.** Do not change requirements or acceptance criteria without asking. Propose changes instead.
 4. **`plan.md` is the how.** Draft it from the spec, then stop and wait for approval before implementing.
 5. **`tasks.md` is the checklist.** Work through tasks in order, one at a time. Mark each `[x]` when done. Commit after each task or small logical group.
 6. **If reality disagrees with the docs, stop.** When implementation shows the spec or plan is wrong or incomplete, flag it and agree on a change before continuing, then update the docs.
 7. **Record significant decisions** as ADRs in `docs/decisions/` (copy `_template.md`, next number). If the decision comes from the register, update the register's status and "Captured in" column in the same change.
-8. **Test the acceptance criteria.** Every acceptance criterion (AC-n) gets at least one test, and the test name or docstring references the AC ID.
+8. **Test the acceptance criteria.** See [Testing policy](#testing-policy).
 
-## Spike guardrails
+## Testing policy
+**Spikes** are exploratory code written to answer one specific question.
+- They live in `spikes/NNN-short-name/`, with a `README.md` that states the question and, when the spike is finished, the answer.
+- Tests are not required for spikes.
+- Spike code is never imported by or copied into `backend/` or `frontend/`. If we keep an idea from a spike, it gets a spec and is rebuilt properly, with tests.
+
+**Feasibility spike code** in `pipeline/` still follows the spec process, but tests are not required. It just needs to work.
+
+**All code in `backend/`, `frontend/`, and `infra/` needs tests:**
+- Every acceptance criterion (AC-n) has at least one test, with the AC ID in the test name or docstring.
+- **Backend:** pytest. Unit tests for logic. Integration tests for API endpoints and database access, run against a real Postgres (the Docker Compose database), not mocks.
+- **Frontend:** Vitest and React Testing Library, for components and the API client.
+- **Infrastructure:** `terraform fmt -check`, `terraform validate`, and a reviewed `terraform plan` count as the checks.
+
+**For code that requires tests:**
+- A task in `tasks.md` is not done until its tests pass.
+- A bug fix starts with a test that reproduces the bug.
+- Every `plan.md` fills in the Testing strategy table, mapping each AC to its tests.
+
+## Feasibility-phase guardrails
 - **What's binding.** Only *Decided* register entries and *Accepted* ADRs are binding. *Proposed* ADRs are recommendations. Don't treat them as settled. If a task depends on one, say so and ask.
 - **Who does what (D-04).** Claude in chat produces design artifacts (rubric, experiment design) and analyzes results. Claude Code builds the repo, acquires data, and runs models.
 - **Don't redefine the semantics.** Don't silently change the claim and recommendation semantics (SiLab §4.4), the evidence-status taxonomy (§4.6), or the six spike pair labels (§7.5, ADR 0010). Propose changes instead. Generated relationships are proposals, never verified facts.
