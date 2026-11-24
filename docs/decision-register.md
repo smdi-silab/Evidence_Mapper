@@ -2,11 +2,11 @@
 
 Nov 24, 2026 · @Tony
 
-> **Repository note (2026-11-24):** Moved from the repository root to `docs/decision-register.md`. The baseline spec referred to below is in the repo at [`specs/Regulatory_Evidence_Mapper_SiLab_Spec.md`](../specs/Regulatory_Evidence_Mapper_SiLab_Spec.md). A **Captured in** column now shows where each entry is recorded: ADRs in [`decisions/`](decisions/), `CLAUDE.md`, `architecture.md`, or spec 001. ADRs for Decided entries are *Accepted*; ADRs for Recommended entries are *Proposed* and become Accepted when the entry is marked Decided. Update both together. "Register (evaluation method)" entries will move into the annotation rubric and experiment design (tasks 8–9) when those are written. Section references such as "spec §10" in the original text point to the SiLab spec.
+> **Repository note (2026-11-24):** Moved from the repository root to `docs/decision-register.md`. The baseline spec referred to below is in the repo at [`specs/Regulatory_Evidence_Mapper_SiLab_Spec.md`](../specs/Regulatory_Evidence_Mapper_SiLab_Spec.md). A **Captured in** column now shows where each entry is recorded: ADRs in [`decisions/`](decisions/), `CLAUDE.md`, `architecture.md`, or spec 001. ADRs for Decided entries are *Accepted*; ADRs for Recommended entries are *Proposed* and become Accepted when the entry is marked Decided. Update both together. "Register (evaluation method)" entries will move into the annotation rubric and experiment design (tasks 8–9) when those are written. Section references such as "spec §4.6" point to the SiLab spec.
 
 ## How to use this register
 
-This register lists the decisions that must be settled before Claude Code writes pipeline code for the feasibility spike. The spec (Regulatory\_Evidence\_Mapper\_SiLab\_Spec.md, dated 24 Nov 2026) remains the baseline. Nothing here redefines claim or recommendation semantics or the evidence-status taxonomy (spec §10); where a decision amends the spec, the affected section is named.
+This register lists the decisions that must be settled before Claude Code writes pipeline code for the feasibility spike. The spec (Regulatory\_Evidence\_Mapper\_SiLab\_Spec.md, dated 24 Nov 2026) remains the baseline. Nothing here redefines claim or recommendation semantics (spec §4.4) or the evidence-status taxonomy (spec §4.6), as spec §10 requires; where a decision amends the spec, the affected section is named.
 
 Each entry has an ID, the options considered, a recommendation and a status:
 
