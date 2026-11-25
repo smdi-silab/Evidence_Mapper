@@ -1,6 +1,6 @@
 # Spec 002: Continuous integration for the pipeline
 
-- **Status:** Approved
+- **Status:** Implemented
 - **Owner:** Tony Lizza
 - **Created:** 2026-11-25
 - **Branch:** feat/002-ci
