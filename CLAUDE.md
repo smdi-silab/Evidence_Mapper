@@ -108,6 +108,7 @@ frontend/            after the gate: React app and frontend tests
 - Pipeline format check: `cd pipeline && uv run ruff format --check .` (`uv run ruff format .` to fix)
 - Pipeline CLI help: `cd pipeline && uv run evidence-mapper --help`
 - Pipeline settings check: `cd pipeline && uv run evidence-mapper config check` (names only; never prints secret values)
+- CI: `.github/workflows/pipeline.yml` runs `uv sync --locked`, ruff check, ruff format check and pytest on every PR to `main` and push to `main` (spec 002). Run the same commands locally before pushing.
 - Infra format check: `cd infra && terraform fmt -check -recursive`
 - Infra validate: `cd infra && terraform init && terraform validate`
 - Infra plan (read-only preview): `cd infra && terraform plan`

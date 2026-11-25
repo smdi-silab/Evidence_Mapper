@@ -19,7 +19,7 @@ Developers working on the spike, including Claude Code. Later specs build each p
 - Testing and linting work from day one.
 
 ## Non-goals
-- Any pipeline logic: docket shortlist (planned spec 002), fetch and freeze (planned spec 003), extraction, and later stages.
+- Any pipeline logic: docket shortlist (planned spec 003), fetch and freeze (planned spec 004), extraction, and later stages.
 - Any model calls, Bedrock setup, or AWS resources.
 - The post-gate web stack: FastAPI, PostgreSQL, Alembic, frontend, Docker Compose (deferred by ADR 0002).
 
