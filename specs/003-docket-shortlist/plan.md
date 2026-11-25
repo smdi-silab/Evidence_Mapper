@@ -39,20 +39,21 @@ pipeline/src/evidence_mapper/acquisition/
 ### Discovery starts from final rules, not dockets
 The `/dockets` endpoint has no comment counts and can only be filtered by last-modified date. That date is a poor proxy for "completed action". Instead, discovery queries `/documents` with `filter[agencyId]=EPA`, `filter[documentType]=Rule` and `filter[postedDate]` within the range, then collects the distinct docket IDs. **This reads FR-2's "date range" as the date the final rule was posted.** Every candidate therefore has a final rule by construction. FR-3 still reports it, from the docket's own document list (phase 3), so AC-2 tests a real check.
 
-- **5,000-result cap.** The API returns at most 20 pages of 250 results. Discovery splits the date range into one-month windows and logs a warning if a window ever reports more than 5,000 results.
+- **Paging (changed after T1).** T1 found no 20-page limit: page 21 at size 250 returned rows. EPA posted 1,405 `Rule` documents from 2022 to 2024, so discovery pages through the whole range in one query (about 6 requests) without month windows. It logs a warning if `totalElements` is over 5,000, in case a limit appears later.
+- **Subtype exclusions (added after T1).** `Rule` documents have a `subtype`. A document with subtype `Correction` or `Withdrawal` doesn't make its docket a candidate, because these aren't completed actions in the DS-01 sense. A docket still counts if it has another `Rule` document. Each row records the subtypes of its final-rule documents.
 - **Title exclusions.** EPA posts many high-volume, low-comment rules, such as state implementation plan approvals and pesticide tolerances. Counting comments for each of them would use most of the request budget. A default, configurable list of title patterns (e.g., `Air Plan Approval`, `Approval and Promulgation of`, `Pesticide Tolerance`) skips them before the counting phase. The report lists the patterns and how many dockets each one excluded, so a person can check whether anything relevant was dropped.
 
 ### Phases and request cost
 | Phase | Requests | What it records |
 |---|---|---|
-| 1. Discover | 1 per month window (more if a month has >250 rules) | docket IDs, final-rule document IDs and titles |
+| 1. Discover | 1 per 250 rules (~6 for 2022–2024) | docket IDs, final-rule document IDs, titles and subtypes |
 | 2. Count | 1 per docket left after exclusions (`/comments?filter[docketId]=…&page[size]=5`, reads `meta.totalElements`) | posted comment count |
 | 3. Documents | 1+ per docket in the comment range (`/documents?filter[docketId]=…`, 250 per page) | final rule present, RTC candidates |
-| 4. Sample | per top candidate: ~1–4 to list comment IDs, 1 per sampled comment (`/comments/{id}?include=attachments`), plus PDF downloads | attachment formats, share with attachments, text-layer share |
+| 4. Sample | per top candidate: ~1–4 to list comment IDs, 1 per sampled comment (`/comments/{id}?include=attachments`), plus PDF downloads | attachment formats, share with attachments, restricted vs downloadable attachments, summed `duplicateComments`, text-layer share |
 
 **Ranking for the top N:** first dockets with at least one RTC candidate, then dockets whose final rule was posted most recently, with docket ID as the final tiebreak. Every in-range docket appears in the shortlist; only the top N get phase 4.
 
-**Unknown until measured:** how many dockets phase 2 must count. T1 measures it with a few live requests. If it doesn't fit in one run, the run stops at its budget and the next run (e.g., an hour later) continues from the cache.
+**Phase 2 volume (measured in T1):** about 1,100 dockets after the title exclusions, a rough estimate scaled from three sample months. That is more than one run's budget. The first run stops at its budget, and a second run about an hour later continues from the cache. The date range stays 2022–2024.
 
 ### Defaults
 | Option | Default | Note |
@@ -102,9 +103,9 @@ data/cache/                              IGNORED: working files, not a freeze; s
   attachments/                           temporary PDFs (deleted after measuring) and results.json
 ```
 - **Run ID:** `shortlist-<UTC timestamp>`, for example `shortlist-20261125T153000Z`.
-- **Shortlist row fields:** `docket_id`, `docket_title`, `posted_comment_count`, `in_comment_range`, `final_rule` (present, document IDs, posted dates), `rtc_candidates` (document ID, type, title, matched pattern), `rank`, `phase_completed`, and for the top N: `sampled_comments`, `share_with_attachments`, `attachment_formats` (format → count), `share_with_download_links` (A-02), and the text-layer figures.
+- **Shortlist row fields:** `docket_id`, `docket_title`, `posted_comment_count`, `in_comment_range`, `final_rule` (present, document IDs, posted dates, subtypes), `rtc_candidates` (document ID, type, title, matched pattern), `rank`, `phase_completed`, and for the top N: `sampled_comments`, `share_with_attachments`, `attachment_formats` (format → count), `share_with_download_links` (A-02), `restricted_attachments` and `downloadable_attachments` (counts, A-02), `sampled_duplicate_comments` (sum of `duplicateComments` over the sample), and the text-layer figures.
 - **Never in outputs or logs:** comment text, comment titles, submitter names, attachment text, the key. Comment titles are left out because they often contain the commenter's name.
-- The summary always states that counts are **posted** comments before campaign collapse, so they aren't DS-01's "unique submissions". It also says that EPA sometimes posts one representative of a mass campaign, so the number of comments received can be higher.
+- The summary always states that counts are **posted** comments before campaign collapse, so they aren't DS-01's "unique submissions". It also says that EPA sometimes posts one representative of a mass campaign, so the number of comments received can be higher. The summed `duplicateComments` is shown as a sample figure, not as a count of unique submissions.
 
 ## CLI
 `evidence-mapper shortlist [options]`, a top-level command:
@@ -156,8 +157,9 @@ Also: a test that the download client never sends `X-Api-Key`.
 - **Comment-count filter by sampling instead of counting:** cheaper, but the count is one request per docket and the range filter needs the exact number.
 
 ## Risks
-- **API details are from memory and unverified:** filter names, the 250-per-page and 20-page limits, `include=attachments`, the `fileFormats` shape, and the rate-limit headers. T1 checks each with a few live requests before the fixtures are written. If anything differs, I'll stop and update this plan.
-- **Phase 2 volume is unknown.** If thousands of dockets remain after the exclusions, the shortlist needs several hourly runs, or a narrower date range or more exclusions. T1 reports the number before the full run.
+- **API details:** checked live in T1 (see tasks.md, Verification results). The plan was updated for the differences: no 20-page limit, subtypes, restricted attachments, `duplicateComments`.
+- **Phase 2 volume:** about 1,100 dockets (T1 estimate), so the live run takes two hourly runs. If the real number is much higher, narrow the date range or add exclusions.
+- **Restricted attachments** (`fileFormats: null`) may be common in some dockets. The report counts them, and a docket where most are restricted fails A-02 for the spike.
 - **Title exclusions can hide a good docket.** Mitigated by reporting exclusion counts per pattern and making the list configurable.
 - **Posted comment counts undercount mass campaigns,** and RTC title matching misses responses inside preambles. Both are stated in the report as caveats, not hidden.
 - **PyMuPDF is AGPL-3.0.** Fine for the spike. If it is kept after the gate in a hosted app, the license needs a decision (open the source, buy a commercial license, or switch to pdfplumber or pypdfium2). Worth a note in the register next to DS-04.
