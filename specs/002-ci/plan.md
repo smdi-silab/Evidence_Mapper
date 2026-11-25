@@ -1,7 +1,7 @@
 # Plan 002: Continuous integration for the pipeline
 
 - **Spec:** [spec.md](spec.md)
-- **Status:** Draft
+- **Status:** Approved
 
 ## Approach
 Add one GitHub Actions workflow, `.github/workflows/pipeline.yml`, with a single job that sets up `uv`, installs the locked dependencies and runs the three checks. GitHub Actions is GitHub's built-in automation service: a YAML file in `.github/workflows/` tells GitHub what to run on its own machines (runners) when events such as a pull request happen. No AWS, no secrets.
@@ -34,6 +34,8 @@ jobs:
         working-directory: pipeline
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1   # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
         with:
           version: "0.13.10"
@@ -49,6 +51,7 @@ jobs:
 - **`uv sync --locked`** fails if `uv.lock` doesn't match `pyproject.toml` (AC-2).
 - **Python 3.12** comes from `pipeline/.python-version`; `uv` downloads it. **`uv` 0.13.10** matches the version installed locally.
 - **Pinned actions (AC-5):** `actions/checkout` v7.0.1 (released 2026-07-20) and `astral-sh/setup-uv` v10.3.3 (released 2026-10-28). The latest setup-uv, v10.4.0, is only five days old, so I chose the newest release that's at least two weeks old.
+- **`persist-credentials: false`** stops checkout from leaving the job's token in the local git config, where later steps could read it.
 - **`concurrency`** cancels an older run when a newer commit is pushed to the same branch.
 - **The checkout keeps `.gitignore`,** so the AC-6 `git check-ignore` test from spec 001 works in CI.
 

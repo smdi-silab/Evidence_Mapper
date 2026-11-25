@@ -36,5 +36,6 @@ The spike pipeline is a Python CLI package in [`pipeline/`](pipeline/).
    uv run ruff check .
    uv run ruff format --check .
    ```
+   The same checks run automatically on every pull request to `main` ([`.github/workflows/pipeline.yml`](.github/workflows/pipeline.yml)).
 
 Spike data lives in [`data/`](data/README.md). Everything there except the manifests is gitignored. The default data location assumes the editable install that `uv sync` creates; set `EVIDENCE_MAPPER_DATA_DIR` if you install the package another way.
