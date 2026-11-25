@@ -37,3 +37,9 @@ crash.*.log
 !.vscode/extensions.json
 .idea/
 .DS_Store
+
+# Spike data (spec 001, ADR 0006, ADR 0007): ignore everything under data/
+# except its README and the manifests. Never commit comment text.
+data/*
+!data/README.md
+!data/manifests/
