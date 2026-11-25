@@ -122,6 +122,7 @@ data/cache/                              IGNORED: working files, not a freeze; s
 ## Dependencies
 - **`httpx`** (BSD-3-Clause): HTTP client.
 - **`pymupdf`** (AGPL-3.0 or commercial; DS-04): PDF text layer. Fine for internal spike use. See Risks.
+  Pinned to `>=1.26,<2` (T2). PyMuPDF 2.x adds `onnxruntime`, `numpy` and a layout model as dependencies (about 200 MB), which a text-layer check doesn't need. 1.28.2 has no dependencies and the same API.
 
 ## Security and privacy
 - GET only; no writes to Regulations.gov.
