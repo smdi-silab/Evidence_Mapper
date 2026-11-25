@@ -6,7 +6,8 @@ Phases (plan 003):
 2. Count: posted comment count per candidate docket.
 3. Documents: for dockets in the comment range, the docket title, whether a final rule is
    present, and documents whose titles look like a response to comments (RTC).
-4. Sample (T6): attachment formats and text layer for the top N.
+4. Sample: for the top N, a seeded sample of comments, their attachment formats, restricted and
+   downloadable attachments, summed `duplicateComments`, and the text layer of a few PDFs.
 
 Phases record results on `ShortlistState` as they go. If the client stops the run (budget or
 rate limit), what finished is kept, and each docket says which phase it completed.
@@ -16,16 +17,25 @@ comment text, comment titles or submitter details.
 """
 
 import logging
+import random
 import re
+from collections import Counter
 from datetime import date
 from enum import IntEnum
+from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
+from evidence_mapper.acquisition.pdf_text import (
+    PdfStatus,
+    TextLayerStore,
+    check_attachment,
+)
 from evidence_mapper.acquisition.regulations_gov import (
     ApiError,
     ApiStop,
+    DownloadClient,
     RegulationsGovClient,
 )
 
@@ -33,6 +43,9 @@ logger = logging.getLogger(__name__)
 
 PAGE_SIZE = 250
 DISCOVERY_WARN_ABOVE = 5_000
+
+MOSTLY_TEXT_SHARE = 0.8  # DS-01: >=80% of pages with a text layer
+MB = 1024 * 1024
 
 DEFAULT_TITLE_EXCLUDES: tuple[str, ...] = (
     r"Air Plan Approval",
@@ -94,6 +107,78 @@ class RtcCandidate(BaseModel):
     matched_pattern: str
 
 
+def _share(numerator: int, denominator: int) -> float | None:
+    return round(numerator / denominator, 4) if denominator else None
+
+
+class TextLayerSummary(BaseModel):
+    """Text-layer figures for the PDFs checked in one docket's sample (FR-5, D-02).
+
+    Every PDF attachment in the sample is a candidate. Those whose declared size is over the cap
+    are counted and never downloaded. A seeded choice of up to `sample_pdfs` of the rest is
+    downloaded, measured and deleted.
+    """
+
+    pdf_attachments: int = 0
+    pdfs_over_size_cap: int = 0
+    pdfs_selected: int = 0
+    pdfs_measured: int = 0
+    pdfs_not_measured: dict[str, int] = Field(default_factory=dict)
+    pages: int = 0
+    pages_with_text: int = 0
+    pdfs_mostly_text: int = 0
+    text_min_chars: int
+    mostly_text_share: float = MOSTLY_TEXT_SHARE
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def page_text_share(self) -> float | None:
+        return _share(self.pages_with_text, self.pages)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def pdfs_mostly_text_share(self) -> float | None:
+        return _share(self.pdfs_mostly_text, self.pdfs_measured)
+
+
+class SampleSummary(BaseModel):
+    """Phase 4 figures for one docket. IDs and counts only (FR-4).
+
+    Shares are computed over the comments fetched, so a failed comment doesn't count as one
+    without attachments. An attachment is downloadable when it has at least one file URL, and
+    restricted when it has a `restrictReasonType`; T1 saw restricted attachments with no file
+    formats.
+    """
+
+    comment_ids_listed: int
+    sampled_comment_ids: list[str]
+    comments_fetched: int = 0
+    comments_failed: int = 0
+    comments_with_attachments: int = 0
+    comments_with_download_links: int = 0
+    attachments: int = 0
+    attachment_formats: dict[str, int] = Field(default_factory=dict)
+    restricted_attachments: int = 0
+    downloadable_attachments: int = 0
+    sampled_duplicate_comments: int = 0
+    text_layer: TextLayerSummary
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def sampled_comments(self) -> int:
+        return len(self.sampled_comment_ids)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def share_with_attachments(self) -> float | None:
+        return _share(self.comments_with_attachments, self.comments_fetched)
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def share_with_download_links(self) -> float | None:
+        return _share(self.comments_with_download_links, self.comments_fetched)
+
+
 class DocketRow(BaseModel):
     """One candidate docket. Metadata only."""
 
@@ -108,7 +193,7 @@ class DocketRow(BaseModel):
     rank: int | None = None
     phase_completed: Phase = Phase.DISCOVERED
     error: str | None = None
-    sample: Any = None  # SampleSummary, filled in phase 4 (T6)
+    sample: SampleSummary | None = None
 
     @property
     def latest_final_rule_date(self) -> str:
@@ -414,3 +499,201 @@ def run_phases_1_to_3(
         state.stop_reason = stop.reason
         logger.warning("run stopped: %s", stop.reason)
     rank(state)
+
+
+# Phase 4: sample
+
+
+def _seeded_rng(seed: int, docket_id: str, purpose: str) -> random.Random:
+    """A generator that depends only on the seed, the docket and the purpose, so each docket's
+    sample is the same on a rerun however many dockets were sampled before it."""
+    return random.Random(f"{seed}:{docket_id}:{purpose}")
+
+
+class _PdfCandidate(BaseModel):
+    url: str
+    size: int | None
+
+
+def _attachments(body: dict[str, Any]) -> list[dict[str, Any]]:
+    included = body.get("included")
+    if not isinstance(included, list):
+        return []
+    return [i for i in included if isinstance(i, dict) and i.get("type") == "attachments"]
+
+
+def tally_comment(body: dict[str, Any], sample: SampleSummary, pdfs: list[_PdfCandidate]) -> None:
+    """Add one comment's attachment figures to `sample`, and its PDF attachments to `pdfs`.
+
+    Reads only `duplicateComments` and the attachments' `fileFormats` and
+    `restrictReasonType`. Comment text, titles and submitter fields are never read.
+    """
+    data = body.get("data")
+    duplicates = _attrs(data).get("duplicateComments") if isinstance(data, dict) else None
+    if isinstance(duplicates, int) and duplicates > 0:
+        sample.sampled_duplicate_comments += duplicates
+
+    attachments = _attachments(body)
+    formats: Counter[str] = Counter(sample.attachment_formats)
+    has_link = False
+    for att in attachments:
+        attrs = _attrs(att)
+        if attrs.get("restrictReasonType"):
+            sample.restricted_attachments += 1
+        file_formats = attrs.get("fileFormats")
+        entries = [f for f in file_formats if isinstance(f, dict)] if file_formats else []
+        linked = [f for f in entries if isinstance(f.get("fileUrl"), str) and f["fileUrl"]]
+        if linked:
+            sample.downloadable_attachments += 1
+            has_link = True
+        for fmt in sorted({str(f.get("format") or "unknown").lower() for f in entries}):
+            formats[fmt] += 1
+        for f in linked:
+            if str(f.get("format") or "").lower() == "pdf":
+                size = f.get("size")
+                pdfs.append(
+                    _PdfCandidate(url=f["fileUrl"], size=size if isinstance(size, int) else None)
+                )
+    sample.attachments += len(attachments)
+    sample.attachment_formats = dict(sorted(formats.items()))
+    if attachments:
+        sample.comments_with_attachments += 1
+    if has_link:
+        sample.comments_with_download_links += 1
+
+
+def check_text_layer(
+    pdfs: list[_PdfCandidate],
+    docket_id: str,
+    options: ShortlistOptions,
+    downloader: DownloadClient,
+    store: TextLayerStore,
+    work_dir: Path,
+) -> TextLayerSummary:
+    """Choose up to `sample_pdfs` PDFs under the size cap (seeded), measure them, sum figures."""
+    max_bytes = int(options.max_pdf_mb * MB)
+    unique = {p.url: p for p in pdfs}
+    candidates = [unique[u] for u in sorted(unique)]
+    summary = TextLayerSummary(
+        pdf_attachments=len(candidates), text_min_chars=options.text_min_chars
+    )
+    within_cap = [p for p in candidates if p.size is None or p.size <= max_bytes]
+    summary.pdfs_over_size_cap = len(candidates) - len(within_cap)
+    rng = _seeded_rng(options.seed, docket_id, "pdfs")
+    selected = rng.sample(within_cap, min(options.sample_pdfs, len(within_cap)))
+    summary.pdfs_selected = len(selected)
+
+    not_measured: Counter[str] = Counter()
+    for pdf in selected:
+        result = check_attachment(
+            pdf.url,
+            docket_id,
+            downloader,
+            store,
+            work_dir,
+            max_bytes=max_bytes,
+            min_chars=options.text_min_chars,
+        )
+        if result.status != PdfStatus.MEASURED:
+            not_measured[str(result.status)] += 1
+            continue
+        summary.pdfs_measured += 1
+        summary.pages += result.pages
+        summary.pages_with_text += result.pages_with_text
+        share = result.text_share
+        if share is not None and share >= MOSTLY_TEXT_SHARE:
+            summary.pdfs_mostly_text += 1
+    summary.pdfs_not_measured = dict(sorted(not_measured.items()))
+    return summary
+
+
+def sample_docket(
+    client: RegulationsGovClient,
+    downloader: DownloadClient,
+    store: TextLayerStore,
+    work_dir: Path,
+    row: DocketRow,
+    options: ShortlistOptions,
+    page_size: int = PAGE_SIZE,
+) -> SampleSummary:
+    """Phase 4 for one docket. Raises `ApiStop` (nothing recorded) or `ApiError` (listing)."""
+    listed, _, _ = _paged(client, "/comments", {"filter[docketId]": row.docket_id}, page_size)
+    all_ids = sorted({i["id"] for i in listed if isinstance(i.get("id"), str)})
+    rng = _seeded_rng(options.seed, row.docket_id, "comments")
+    sampled = sorted(rng.sample(all_ids, min(options.sample_comments, len(all_ids))))
+    sample = SampleSummary(
+        comment_ids_listed=len(all_ids),
+        sampled_comment_ids=sampled,
+        text_layer=TextLayerSummary(text_min_chars=options.text_min_chars),
+    )
+    pdfs: list[_PdfCandidate] = []
+    for comment_id in sampled:
+        try:
+            body = client.get_json(f"/comments/{comment_id}", {"include": "attachments"})
+        except ApiError as err:
+            sample.comments_failed += 1
+            logger.warning("comment %s failed: status=%s", comment_id, err.status)
+            continue
+        sample.comments_fetched += 1
+        tally_comment(body, sample, pdfs)
+    sample.text_layer = check_text_layer(pdfs, row.docket_id, options, downloader, store, work_dir)
+    return sample
+
+
+def sample_top(
+    client: RegulationsGovClient,
+    downloader: DownloadClient,
+    store: TextLayerStore,
+    work_dir: Path,
+    state: ShortlistState,
+    page_size: int = PAGE_SIZE,
+) -> None:
+    """Phase 4 for the top N ranked dockets that haven't been sampled yet.
+
+    A docket is marked `SAMPLED` only when its whole sample finished. If the run stops part-way
+    through a docket, nothing is recorded for it, and a rerun replays its requests from the cache.
+    """
+    for row in state.top_rows():
+        if row.phase_completed >= Phase.SAMPLED or row.error:
+            continue
+        try:
+            row.sample = sample_docket(
+                client, downloader, store, work_dir, row, state.options, page_size
+            )
+        except ApiError as err:
+            row.error = f"sample failed: status={err.status}"
+            logger.warning("sample failed for %s: status=%s", row.docket_id, err.status)
+            continue
+        row.phase_completed = Phase.SAMPLED
+        tl = row.sample.text_layer
+        logger.info(
+            "sample for %s: %d of %d comments fetched, %d with attachments, "
+            "%d PDFs measured, %d/%d pages with text",
+            row.docket_id,
+            row.sample.comments_fetched,
+            row.sample.sampled_comments,
+            row.sample.comments_with_attachments,
+            tl.pdfs_measured,
+            tl.pages_with_text,
+            tl.pages,
+        )
+
+
+def run_shortlist(
+    client: RegulationsGovClient,
+    downloader: DownloadClient,
+    store: TextLayerStore,
+    work_dir: Path,
+    state: ShortlistState,
+    page_size: int = PAGE_SIZE,
+) -> None:
+    """All four phases. Phase 4 runs only when phases 1-3 finished, because a partial ranking
+    could spend the sample budget on dockets that later drop out of the top N."""
+    run_phases_1_to_3(client, state, page_size)
+    if state.stopped_early:
+        return
+    try:
+        sample_top(client, downloader, store, work_dir, state, page_size)
+    except ApiStop as stop:
+        state.stop_reason = stop.reason
+        logger.warning("run stopped: %s", stop.reason)
