@@ -11,4 +11,30 @@ This project uses spec-driven development. See [`specs/README.md`](specs/README.
 Spike: a Python 3.12 CLI pipeline (uv, Pydantic, pytest) using open-weight models on AWS Bedrock or local hardware. After the gate (provisional): FastAPI + PostgreSQL backend and a web UI, deployed to AWS with Terraform. See [`docs/architecture.md`](docs/architecture.md) and the ADRs in [`docs/decisions/`](docs/decisions/).
 
 ## Getting started
-<!-- Filled in by spec 001 (spike foundation). -->
+The spike pipeline is a Python CLI package in [`pipeline/`](pipeline/).
+
+1. Install [uv](https://docs.astral.sh/uv/getting-started/installation/). It downloads Python 3.12 for you if needed.
+2. Install the package and its dependencies:
+   ```bash
+   cd pipeline
+   uv sync
+   ```
+3. Check that it runs:
+   ```bash
+   uv run evidence-mapper --help
+   uv run evidence-mapper --version
+   ```
+4. Set the environment variables listed in [`pipeline/.env.example`](pipeline/.env.example). The pipeline reads settings only from the environment. For local use, copy the example to `pipeline/.env` (gitignored), fill it in, and pass it to `uv`:
+   ```bash
+   cp .env.example .env    # then edit .env; never commit it
+   uv run --env-file .env evidence-mapper config check
+   ```
+   `config check` lists each setting as set or not set and exits with an error if a required one is missing. It never prints secret values.
+5. Run the tests and checks:
+   ```bash
+   uv run pytest
+   uv run ruff check .
+   uv run ruff format --check .
+   ```
+
+Spike data lives in [`data/`](data/README.md). Everything there except the manifests is gitignored. The default data location assumes the editable install that `uv sync` creates; set `EVIDENCE_MAPPER_DATA_DIR` if you install the package another way.

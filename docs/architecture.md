@@ -10,6 +10,12 @@ The project is in its **feasibility spike** ([ADR 0002](decisions/0002-feasibili
 ## Spike pipeline (current)
 A Python CLI package in `pipeline/` (ADR 0006, proposed). Each stage is a separate module that reads and writes versioned JSONL, so a failure can be traced to one stage.
 
+Package skeleton (spec 001):
+- `evidence_mapper/cli.py`: the `evidence-mapper` command (Typer). Subcommands are added by the stage specs.
+- `evidence_mapper/config.py`: settings from environment variables only (Pydantic Settings). Missing settings fail only when a command needs them, with the variable's name and never its value.
+- `evidence_mapper/log.py`: logging to stderr under SP-01, with a redaction filter for secret settings as a backstop.
+- One module per stage: `acquisition`, `extraction`, `canonicalization`, `retrieval`, `classification`, `evaluation`.
+
 ```text
 Regulations.gov API (read-only)
   -> 1. Docket shortlist          candidate EPA dockets with comment counts, attachment types, RTC availability
@@ -28,7 +34,7 @@ Regulations.gov API (read-only)
 | Piece | Where it runs | Notes |
 |-------|---------------|-------|
 | Source data | Regulations.gov API v4 | Public data. Requires an api.data.gov key from the environment. The client throttles to the published rate limits (DS-06). |
-| Frozen dataset | `data/` on the developer machine | Raw and extracted data is gitignored. Only manifests are committed. |
+| Frozen dataset | `data/` on the developer machine | Everything is gitignored except `data/manifests/` and the README. Layout (spike only) in [`data/README.md`](../data/README.md). |
 | LLM inference | AWS Bedrock (open-weight models) or a local runtime (Ollama/vLLM) | Chosen by configuration through one client interface (ADR 0003, ADR 0005). Claude may be used during the pilot (ADR 0012). |
 | Embeddings | Local, CPU (sentence-transformers class) | ADR 0004 (proposed). |
 | Annotation | To be decided (AM-10; Label Studio recommended) | Self-hostable. Must be permitted on the network. |
@@ -38,7 +44,7 @@ Regulations.gov API (read-only)
 ## Portability
 D-01 requires that the app can be hosted on local hardware, not only in AWS. Rules that follow from that:
 - Model access goes through the client interface that doesn't depend on the provider. No pipeline code calls Bedrock directly.
-- The app reads configuration and secrets from environment variables. In AWS, Secrets Manager injects them. Locally, they come from `.env`.
+- The app reads configuration and secrets from environment variables. In AWS, Secrets Manager injects them. Locally, they come from the shell or a gitignored `.env` passed with `uv run --env-file .env`; the app never reads `.env` itself.
 - AWS-specific services (S3, RDS, ECS) are deployment choices kept behind configuration, not dependencies in the app code.
 - The local hardware envelope is still unknown (MI-05). It determines the largest feasible model and the cost projection.
 

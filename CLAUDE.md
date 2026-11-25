@@ -102,10 +102,12 @@ frontend/            after the gate: React app and frontend tests
 - **After the gate:** FastAPI routers grouped by domain under `backend/app/api/`, with API routes versioned under `/api/v1`. Database schema changes go only through Alembic migrations, never by hand. Frontend API calls go in a dedicated client module, not scattered through components.
 
 ## Commands
-<!-- Fill these in once spec 001 is implemented. -->
+- Pipeline setup: `cd pipeline && uv sync`
 - Pipeline tests: `cd pipeline && uv run pytest`
 - Pipeline lint: `cd pipeline && uv run ruff check .`
+- Pipeline format check: `cd pipeline && uv run ruff format --check .` (`uv run ruff format .` to fix)
 - Pipeline CLI help: `cd pipeline && uv run evidence-mapper --help`
+- Pipeline settings check: `cd pipeline && uv run evidence-mapper config check` (names only; never prints secret values)
 - Infra format check: `cd infra && terraform fmt -check -recursive`
 - Infra validate: `cd infra && terraform init && terraform validate`
 - Infra plan (read-only preview): `cd infra && terraform plan`
