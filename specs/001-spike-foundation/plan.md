@@ -73,7 +73,7 @@ pipeline/
 ## Settings
 | Variable | Field | Type | Required by | Secret | Default |
 |---|---|---|---|---|---|
-| `REGULATIONS_GOV_API_KEY` | `regulations_gov_api_key` | `SecretStr \| None` | acquisition (spec 003); `config check` | yes | none |
+| `REGULATIONS_GOV_API_KEY` | `regulations_gov_api_key` | `SecretStr \| None` | acquisition (spec 004); `config check` | yes | none |
 | `AWS_PROFILE` | `aws_profile` | `str \| None` | model calls (later spec) | no | none |
 | `EVIDENCE_MAPPER_DATA_DIR` | `data_dir` | `Path` | all stages | no | `<repo>/data` |
 | `EVIDENCE_MAPPER_LOG_LEVEL` | `log_level` | `str` | logging | no | `INFO` |
