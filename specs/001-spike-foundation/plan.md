@@ -1,7 +1,7 @@
 # Plan 001: Spike foundation
 
 - **Spec:** [spec.md](spec.md)
-- **Status:** Draft
+- **Status:** Approved
 
 ## Approach
 Create a small Python 3.12 package in `pipeline/` using the `src/` layout, managed with `uv`. It has a Typer-based CLI named `evidence-mapper`, one empty module per pipeline stage, Pydantic Settings that read only from environment variables, and a logging setup that follows SP-01. A default-deny `.gitignore` rule for `data/` lets only the manifests through. Tests cover every acceptance criterion, even though tests are optional for spike code, because they're cheap here and AC-5 and AC-6 ask for them.
