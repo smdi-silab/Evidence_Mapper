@@ -48,7 +48,7 @@ The `/dockets` endpoint has no comment counts and can only be filtered by last-m
 |---|---|---|
 | 1. Discover | 1 per 250 rules (~6 for 2022–2024) | docket IDs, final-rule document IDs, titles and subtypes |
 | 2. Count | 1 per docket left after exclusions (`/comments?filter[docketId]=…&page[size]=5`, reads `meta.totalElements`) | posted comment count |
-| 3. Documents | 1+ per docket in the comment range (`/documents?filter[docketId]=…`, 250 per page) | final rule present, RTC candidates |
+| 3. Documents | 2+ per docket in the comment range (`/dockets/{id}` for the title, then `/documents?filter[docketId]=…`, 250 per page) | docket title, final rule present, RTC candidates |
 | 4. Sample | per top candidate: ~1–4 to list comment IDs, 1 per sampled comment (`/comments/{id}?include=attachments`), plus PDF downloads | attachment formats, share with attachments, restricted vs downloadable attachments, summed `duplicateComments`, text-layer share |
 
 **Ranking for the top N:** first dockets with at least one RTC candidate, then dockets whose final rule was posted most recently, with docket ID as the final tiebreak. Every in-range docket appears in the shortlist; only the top N get phase 4.
